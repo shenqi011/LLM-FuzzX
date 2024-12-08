@@ -1,52 +1,19 @@
 # src/models/llama_model.py
-"""
-LlamaModel class to interact with LLaMA models.
-"""
+from src.models.huggingface_model import HuggingFaceModel
 
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-class LlamaModel:
+class LlamaModel(HuggingFaceModel):
     """
-    Class to interact with LLaMA models.
+    LlamaModel继承自HuggingFaceModel，使用HuggingFaceModel的generate逻辑。
+    如果将来有特定LLaMA逻辑可在这里重写。
     """
-
-    def __init__(self, model_name, device='cuda', precision='float16', **kwargs):
-        """
-        Initializes the LlamaModel.
-
-        Args:
-            model_name (str): Name or path of the LLaMA model.
-            device (str): Device to load the model on.
-            precision (str): Precision of the model (e.g., 'float16').
-            **kwargs: Additional arguments.
-        """
-        self.model_name = model_name
-        self.device = device
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name, torch_dtype=getattr(torch, precision)
-        ).to(device)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model.eval()
-
-    def generate(self, prompt, max_new_tokens=512, temperature=0.7, **kwargs):
-        """
-        Generates a response using the LLaMA model.
-
-        Args:
-            prompt (str): The input prompt.
-            max_new_tokens (int): Maximum number of new tokens to generate.
-            temperature (float): Sampling temperature.
-            **kwargs: Additional arguments.
-
-        Returns:
-            str: The generated response.
-        """
-        inputs = self.tokenizer(prompt, return_tensors='pt').to(self.device)
-        outputs = self.model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
-            **kwargs
-        )
-        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+    def __init__(self, model_name: str, device: str = 'cuda', precision: str = 'float16', **kwargs):
+        super().__init__(model_name, device=device, precision=precision, **kwargs)
+        self.init_terminators()
+        
+    def init_terminators(self):
+        """初始化LLaMA模型的终止符"""
+        self.terminators = [
+            self.tokenizer.eos_token_id,
+            self.tokenizer.convert_tokens_to_ids("<|eot_id|>")
+        ]
+        self.gen_kwargs["eos_token_id"] = self.terminators
