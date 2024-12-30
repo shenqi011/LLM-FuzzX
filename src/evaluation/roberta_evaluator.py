@@ -7,7 +7,6 @@ from transformers import RobertaForSequenceClassification, RobertaTokenizer
 from typing import Dict, Any, Union
 import logging
 import re
-from src.utils.logger import setup_logging
 from datetime import datetime
 
 class RoBERTaEvaluator:
@@ -30,7 +29,7 @@ class RoBERTaEvaluator:
         """
         self.device = device
         self.batch_size = batch_size
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger('evaluation')  # 使用evaluation logger
         
         try:
             self.model = RobertaForSequenceClassification.from_pretrained(model_path).to(device)

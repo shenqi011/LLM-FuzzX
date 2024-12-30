@@ -9,112 +9,83 @@ from typing import Optional
 import json
 from datetime import datetime
 
-def setup_logging(log_dir: str = "logs", log_name: str = None) -> logging.Logger:
+def setup_multi_logger(log_dir: Path, level: str = 'INFO', log_to_console: bool = True) -> dict:
     """
-    设置统一的日志系统
+    设置分层日志系统
     
     Args:
-        log_dir: 日志目录
-        log_name: 日志文件名前缀,如果不指定则使用时间戳
+        log_dir: 日志目录路径
+        level: 日志级别
+        log_to_console: 是否输出到控制台
         
     Returns:
-        logging.Logger: 配置好的logger
+        dict: 包含各个logger的字典
     """
-    # 创建日志目录
-    log_dir = Path(log_dir)
+    # 确保日志目录存在
     log_dir.mkdir(parents=True, exist_ok=True)
     
-    # 生成日志文件名
-    if not log_name:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_name = f"fuzzing_{timestamp}"
-        
-    # 创建logger
-    logger = logging.getLogger("fuzzing")
-    logger.setLevel(logging.DEBUG)
-    
-    # 创建格式化器
+    # 基础日志格式
     formatter = logging.Formatter(
-        '%(asctime)s [%(levelname)s] %(message)s',
+        '%(asctime)s [%(levelname)s] [%(name)s] %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    # 创建并配置文件处理器 - 完整日志
-    full_handler = logging.FileHandler(
-        log_dir / f"{log_name}_full.log",
-        encoding='utf-8'
-    )
-    full_handler.setFormatter(formatter)
-    full_handler.setLevel(logging.DEBUG)
-    logger.addHandler(full_handler)
+    # 定义不同的logger和对应的文件
+    loggers = {
+        'main': {  # 主要流程日志
+            'file': log_dir / 'main.log',
+            'level': level
+        },
+        'mutation': {  # 变异操作日志
+            'file': log_dir / 'mutation.log',
+            'level': level
+        },
+        'jailbreak': {  # 越狱日志
+            'file': log_dir / 'jailbreak.log',
+            'level': level
+        },
+        'error': {  # 错误日志
+            'file': log_dir / 'error.log',
+            'level': 'ERROR'
+        }
+    }
     
-    # 创建并配置文件处理器 - 成功案例
-    success_handler = logging.FileHandler(
-        log_dir / f"{log_name}_success.log",
-        encoding='utf-8'
-    )
-    success_handler.setFormatter(formatter)
-    success_handler.setLevel(logging.INFO)
-    success_handler.addFilter(lambda record: 'SUCCESS' in record.getMessage())
-    logger.addHandler(success_handler)
+    # 创建总日志文件的handler
+    all_handler = logging.FileHandler(log_dir / 'all.log', encoding='utf-8')
+    all_handler.setFormatter(formatter)
+    all_handler.setLevel(getattr(logging, level))
     
-    # 创建并配置文件处理器 - 评估结果
-    eval_handler = logging.FileHandler(
-        log_dir / f"{log_name}_eval.log",
-        encoding='utf-8'
-    )
-    eval_handler.setFormatter(formatter)
-    eval_handler.setLevel(logging.INFO)
-    eval_handler.addFilter(lambda record: 'EVAL' in record.getMessage())
-    logger.addHandler(eval_handler)
+    # 创建控制台handler
+    console_handler = None
+    if log_to_console:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        console_handler.setLevel(getattr(logging, level))
     
-    # 创建并配置控制台处理器
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    console_handler.setLevel(logging.INFO)
-    logger.addHandler(console_handler)
+    # 创建和配置每个logger
+    logger_dict = {}
+    for name, config in loggers.items():
+        # 创建logger
+        logger = logging.getLogger(name)
+        logger.setLevel(getattr(logging, config['level']))
+        logger.propagate = False  # 防止日志传播到父logger
+        
+        # 清除现有的handlers
+        logger.handlers.clear()
+        
+        # 添加文件处理器
+        file_handler = logging.FileHandler(config['file'], encoding='utf-8')
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(getattr(logging, config['level']))
+        logger.addHandler(file_handler)
+        
+        # 添加总日志处理器
+        logger.addHandler(all_handler)
+        
+        # 添加控制台处理器
+        if console_handler:
+            logger.addHandler(console_handler)
+            
+        logger_dict[name] = logger
     
-    return logger
-
-def log_mutation(logger: logging.Logger, mutation_type: str, original: str, mutated: str):
-    """记录变异操作"""
-    logger.debug(
-        f"MUTATION [{mutation_type}]\n"
-        f"Original: {original[:100]}...\n"
-        f"Mutated: {mutated[:100]}..."
-    )
-
-def log_evaluation(logger: logging.Logger, prompt: str, response: str, result: dict):
-    """记录评估结果"""
-    logger.info(
-        f"EVAL\n"
-        f"Prompt: {prompt[:100]}...\n"
-        f"Response: {response[:100]}...\n"
-        f"Result: {json.dumps(result, ensure_ascii=False)}"
-    )
-
-def log_success(logger: logging.Logger, prompt: str, response: str, metadata: dict = None):
-    """记录成功案例"""
-    logger.info(
-        f"SUCCESS\n"
-        f"Prompt: {prompt}\n"
-        f"Response: {response}\n"
-        f"Metadata: {json.dumps(metadata, ensure_ascii=False) if metadata else '{}'}"
-    )
-
-def log_stats(logger: logging.Logger, stats: dict):
-    """记录统计信息"""
-    logger.info(f"STATS {json.dumps(stats, ensure_ascii=False)}")
-
-def get_logger(name: str) -> logging.Logger:
-    """获取指定名称的logger"""
-    return logging.getLogger(name)
-
-# 添加日志级别常量
-LOG_LEVELS = {
-    'DEBUG': logging.DEBUG,
-    'INFO': logging.INFO,
-    'WARNING': logging.WARNING,
-    'ERROR': logging.ERROR,
-    'CRITICAL': logging.CRITICAL
-}
+    return logger_dict

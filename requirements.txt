@@ -1,1 +1,6 @@
 nltk
+langdetect
+google-cloud-translate
+tenacity
+flask
+flask_cors

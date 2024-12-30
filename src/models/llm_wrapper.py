@@ -63,14 +63,7 @@ class LLMWrapper(ABC):
     }
 
     def validate_model_name(self, vendor: str, model_name: str):
-        if vendor not in self.SUPPORTED_MODELS:
-            raise ValueError(f"Unknown vendor '{vendor}'. Supported vendors: {list(self.SUPPORTED_MODELS.keys())}")
-
-        if model_name not in self.SUPPORTED_MODELS[vendor]:
-            raise ValueError(
-                f"Model '{model_name}' is not supported by {vendor}. "
-                f"Please choose from: {self.SUPPORTED_MODELS[vendor]}"
-            )
+        return True
 
     @abstractmethod
     def generate(self, prompt: str, **kwargs) -> Union[str, List[str]]:

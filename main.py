@@ -15,8 +15,9 @@ from src.fuzzing.fuzzing_engine import FuzzingEngine
 from src.fuzzing.seed_selector import UCBSeedSelector
 from src.fuzzing.mutator import LLMMutator
 from src.evaluation.roberta_evaluator import RoBERTaEvaluator
-from src.utils.logger import setup_logging
+from src.utils.logger import setup_multi_logger
 from src.utils.helpers import load_harmful_questions
+from src.fuzzing.seed_selector import SeedManager
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Fuzzing LLMs to generate jailbreak prompts.')
@@ -42,14 +43,29 @@ def parse_arguments():
                         help='Exploration weight for UCB')
     parser.add_argument('--temperature', type=float, default=0.7,
                         help='Temperature for LLM mutation')
+    parser.add_argument('--mutator_temperature', type=float, default=0.0,
+                        help='Temperature for mutator model')
     
     # 输出相关参数
-    parser.add_argument('--output_dir', type=str, default='results',
+    parser.add_argument('--output_dir', type=str, default='logs',
                         help='Directory to save results')
     parser.add_argument('--log_level', type=str, default='DEBUG',
                         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                         help='Logging level')
     
+    # 最大成功次数
+    parser.add_argument('--max_successes', type=int, default=3,
+                        help='Maximum number of successful jailbreak attempts')
+    
+    parser.add_argument('--selector_type', type=str, default='ucb',
+                        choices=['ucb', 'diversity_ucb'],
+                        help='Type of seed selector')
+    parser.add_argument('--save-name', type=str, default='',
+                        help='Directory to save results')
+    parser.add_argument('--task', type=str, default='',
+                        help='Task aware')
+    parser.add_argument('--device', type=str, default='0',
+                        help='Device to use')
     return parser.parse_args()
 
 def setup_output_dir(output_dir: str) -> Path:
@@ -59,99 +75,65 @@ def setup_output_dir(output_dir: str) -> Path:
     output_path.mkdir(parents=True, exist_ok=True)
     return output_path
 
+def save_experiment_config(output_path: Path, args: argparse.Namespace):
+    """保存实验配置参数到文件"""
+    config = vars(args)  # 将参数转换为字典
+    config_file = output_path / 'experiment_config.json'
+    
+    with open(config_file, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+
 def log_dict(logger: logging.Logger, data: dict, level: int = logging.INFO):
     """格式化记录字典数据"""
     logger.log(level, json.dumps(data, indent=2, ensure_ascii=False))
 
-def setup_multi_logger(log_dir: Path, level: str = 'INFO') -> dict:
-    """
-    设置分层日志系统
-    
-    Args:
-        log_dir: 日志目录路径
-        level: 日志级别
-        
-    Returns:
-        dict: 包含各个logger的字典
-    """
-    # 确保日志目录存在
-    log_dir.mkdir(parents=True, exist_ok=True)
-    
-    # 基础日志格式
-    formatter = logging.Formatter(
-        '%(asctime)s [%(levelname)s] [%(name)s] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    
-    # 定义不同的logger和对应的文件
-    loggers = {
-        'main': {
-            'file': log_dir / 'main.log',
-            'level': level
-        },
-        'api': {
-            'file': log_dir / 'api.log',
-            'level': level
-        },
-        'mutation': {
-            'file': log_dir / 'mutation.log',
-            'level': level
-        },
-        'stats': {
-            'file': log_dir / 'stats.log',
-            'level': level
-        }
-    }
-    
-    # 创建和配置每个logger
-    logger_dict = {}
-    for name, config in loggers.items():
-        # 创建logger
-        logger = logging.getLogger(name)
-        logger.setLevel(getattr(logging, config['level']))
-        logger.propagate = False  # 防止日志传播到父logger
-        
-        # 添加文件处理器
-        file_handler = logging.FileHandler(config['file'], encoding='utf-8')
-        file_handler.setFormatter(formatter)
-        file_handler.setLevel(getattr(logging, config['level']))
-        logger.addHandler(file_handler)
-        
-        # 添加控制台处理器(仅对main logger)
-        if name == 'main':
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(formatter)
-            console_handler.setLevel(getattr(logging, level))
-            logger.addHandler(console_handler)
-            
-        logger_dict[name] = logger
-    
-    return logger_dict
-
 def main():
+    # 设置代理 7890
+    import os
+    os.environ['http_proxy'] = 'http://127.0.0.1:7890'
+    os.environ['https_proxy'] = 'http://127.0.0.1:7890'
+
     # 解析参数
     args = parse_arguments()
     
     # 设置输出目录
-    output_path = setup_output_dir(args.output_dir)
+    if args.save_name != '':
+        output_path = Path(args.output_dir) / args.save_name
+        output_path.mkdir(parents=True, exist_ok=True)
+    else:
+        output_path = setup_output_dir(args.output_dir)
+        if not output_path.exists():
+            output_path.mkdir(parents=True, exist_ok=True)
     
-    # 设置日志
+    # 保存实验配置
+    save_experiment_config(output_path, args)
+    
+    # 设置日志系统
     loggers = setup_multi_logger(
         level=args.log_level,
-        log_dir=output_path
+        log_dir=output_path,
+        log_to_console=True
     )
     
     try:
-        # 加载种子和问题
+        # 初始化种子管理器
+        seed_manager = SeedManager(save_dir=output_path / 'seeds')
+        
+        # 加载初始种子
         initial_seeds = load_seeds(args.seed_path)
-        harmful_questions = load_harmful_questions(args.questions_path)
+        for seed in initial_seeds:
+            seed_manager.add_seed(content=seed)
+            
+        # 加载问题时传入task参数
+        harmful_questions = load_harmful_questions(args.questions_path, task=args.task)
         
         # 记录初始状态
-        loggers['api'].info(json.dumps({
+        loggers['main'].info(json.dumps({
             "initial_seeds": len(initial_seeds),
             "harmful_questions": len(harmful_questions),
             "target_model": args.target_model,
-            "mutator_model": args.mutator_model
+            "mutator_model": args.mutator_model,
+            "task": args.task  # 记录task参数
         }))
         
         # 初始化模型
@@ -160,19 +142,20 @@ def main():
         loggers['main'].info("Initialized target and mutator models")
         
         # 初始化评估器
-        evaluator = RoBERTaEvaluator()
+        evaluator = RoBERTaEvaluator(device="cuda:"+args.device)
         loggers['main'].info("Initialized RoBERTa evaluator")
         
         # 初始化变异器
         mutator = LLMMutator(
             llm=mutator_model,
-            temperature=args.temperature
+            seed_manager=seed_manager,
+            temperature=args.mutator_temperature
         )
         loggers['main'].info("Initialized LLM mutator")
         
         # 初始化种子选择器
         seed_selector = UCBSeedSelector(
-            seed_pool=initial_seeds,
+            seed_manager=seed_manager,
             exploration_weight=args.exploration_weight
         )
         loggers['main'].info("Initialized UCB seed selector")
@@ -189,22 +172,24 @@ def main():
             results_file=output_path / 'results.txt',
             success_file=output_path / 'successful_jailbreaks.csv',
             summary_file=output_path / 'experiment_summary.txt',
+            seed_flow_file=output_path / 'seed_flow.json',
+            max_successes=args.max_successes,
             loggers=loggers
         )
         loggers['main'].info("Initialized fuzzing engine")
         
         # 确保引擎运行前记录状态
-        loggers['api'].info("Starting fuzzing engine...")
+        loggers['main'].info("Starting fuzzing engine...")
         
         # 运行fuzzing过程
         engine.run()
         
     except Exception as e:
-        loggers['api'].error(f"Error in main: {str(e)}")
+        loggers['error'].error(f"Error in main: {str(e)}")
         raise
 
 def load_seeds(seed_path):
-    """加载种子数据"""
+    """载种子数据"""
     try:
         df = pd.read_csv(seed_path)
         return df['text'].tolist()
