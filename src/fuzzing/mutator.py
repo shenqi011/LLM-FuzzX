@@ -50,43 +50,7 @@ class BaseMutator(ABC):
         """执行变异操作"""
         pass
 
-class MutationType(Enum):
-    """变异类型枚举"""
-    SIMILAR = "similar"
-    CROSSOVER = "crossover" 
-    EXPAND = "expand"
-    SHORTEN = "shorten"
-    REPHRASE = "rephrase"
-    SYNONYM = "synonym"
-    TARGET_AWARE = "target_aware"
 
-class BaseMutator(ABC):
-    """变异器基类"""
-    
-    def __init__(self, placeholder: str = '[INSERT PROMPT HERE]', min_words: int = 3):
-        self.placeholder = placeholder
-        self.min_words = min_words
-        self.last_mutation_type = None
-        self.logger = logging.getLogger('mutation')
-        
-    def _validate_prompt(self, prompt: str) -> bool:
-        """验证prompt是否有效"""
-        if self.placeholder not in prompt:
-            return False
-            
-        words = prompt.replace(self.placeholder, "PLACEHOLDER_TOKEN").split()
-        non_placeholder_words = [w for w in words if w != "PLACEHOLDER_TOKEN"]
-        
-        if len(non_placeholder_words) < self.min_words:
-            return False
-            
-        return True
-    
-    @abstractmethod
-    def mutate(self, prompt: str, seed_id: str = None) -> List[str]:
-        """执行变异操作"""
-        pass
-    
 class LLMMutator(BaseMutator):
     """基于LLM的变异器"""
     
