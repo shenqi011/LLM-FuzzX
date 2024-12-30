@@ -19,6 +19,7 @@ from src.utils.helpers import load_harmful_questions, load_harmful_questions_fro
 
 app = Flask(__name__)
 
+
 # 修改CORS配置，允许所有来源访问
 CORS(app, resources={
     r"/api/*": {  # 只对/api/开头的路由应用CORS
