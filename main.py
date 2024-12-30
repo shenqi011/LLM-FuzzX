@@ -187,6 +187,7 @@ def main():
     except Exception as e:
         loggers['error'].error(f"Error in main: {str(e)}")
         raise
+    
 
 def load_seeds(seed_path):
     """载种子数据"""
