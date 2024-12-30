@@ -50,7 +50,6 @@ class BaseMutator(ABC):
         """执行变异操作"""
         pass
 
-
 class LLMMutator(BaseMutator):
     """基于LLM的变异器"""
     
