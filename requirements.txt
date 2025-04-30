@@ -5,3 +5,6 @@ tenacity
 flask
 flask_cors
 openai
+torch
+pandas
+transformers
