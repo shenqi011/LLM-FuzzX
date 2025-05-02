@@ -3,7 +3,7 @@ import instance from "./index";
 
 // 根据环境配置baseURL
 const API_BASE_URL =
-  process.env.VUE_APP_API_BASE_URL || "http://101.6.21.31:10003/api";
+  process.env.VUE_APP_API_BASE_URL || "http://127.0.0.1:10003/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,

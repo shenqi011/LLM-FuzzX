@@ -10,9 +10,7 @@
         <el-menu-item index="/seed-flow">种子流可视化</el-menu-item>
       </el-menu>
     </nav>
-    <div class="user-greeting">
-      Hello, admin1024
-    </div>
+    <div class="user-greeting">Hello, admin1024</div>
   </header>
 </template>
 

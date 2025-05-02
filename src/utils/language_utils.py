@@ -3,7 +3,7 @@ from google.cloud import translate_v2 as translate
 import logging
 from typing import Tuple
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from ...config import TRANSLATE_API_KEY
+from config import TRANSLATE_API_KEY
 logger = logging.getLogger('main')
 
 def translate_text(target: str, text: str) -> dict:

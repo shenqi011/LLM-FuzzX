@@ -33,7 +33,7 @@ def parse_arguments():
                         default='data/seeds/GPTFuzzer.csv',
                         help='Path to seed prompts')
     parser.add_argument('--questions_path', type=str,
-                        default='data/questions/harmful_questions.txt',
+                        default='data/questions/question.txt',
                         help='Path to harmful questions')
     
     # Fuzzing参数
