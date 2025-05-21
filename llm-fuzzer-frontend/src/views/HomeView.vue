@@ -17,7 +17,8 @@
         >
           <el-option label="GPT-3.5" value="gpt-3.5-turbo"></el-option>
           <el-option label="GPT-4" value="gpt-4o"></el-option>
-          <el-option label="LLaMA2-7B" value="llama2-7b"></el-option>
+          <el-option label="DeepSeek-Chat" value="deepseek-chat"></el-option>
+          <!-- <el-option label="LLaMA2-7B" value="llama2-7b"></el-option> -->
           <el-option label="LLaMA3-8B" value="llama3-8b"></el-option>
           <el-option label="LLaMA3.1-8B" value="llama3.1-8b"></el-option>
         </el-select>

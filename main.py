@@ -134,7 +134,7 @@ def main():
             "target_model": args.target_model,
             "mutator_model": args.mutator_model,
             "task": args.task  # 记录task参数
-        }))
+        }, indent=2, ensure_ascii=False))
         
         # 初始化模型
         target_model = OpenAIModel(model_name=args.target_model)

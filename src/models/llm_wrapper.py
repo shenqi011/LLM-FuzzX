@@ -49,7 +49,8 @@ class LLMWrapper(ABC):
             "text-davinci-003",
             "gpt-3.5-turbo",
             "gpt-4",
-            "gpt-4o"
+            "gpt-4o",
+            "deepseek-chat"
         ],
         "huggingface": [
             "meta-llama/Llama-2-7b-chat-hf",

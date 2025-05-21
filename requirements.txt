@@ -8,3 +8,4 @@ openai
 torch
 pandas
 transformers
+python-dotenv
