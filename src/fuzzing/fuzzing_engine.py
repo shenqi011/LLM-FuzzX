@@ -365,8 +365,8 @@ class FuzzingEngine:
             # 如果所有问题都已经3次成功，就可以提前结束
             if not question_pairs:
                 self.loggers['main'].info(f"All questions have reached {self.max_successes} successful jailbreak attempts. Stopping fuzzing.")
-                # 直接结束
-                self._finalize_if_needed()
+                # 直接结束，但强制保存结果
+                self._finalize_if_needed(force_save=True)
                 return False
 
             for (question_zh, question_en) in question_pairs:
@@ -458,10 +458,10 @@ class FuzzingEngine:
 
         return True
 
-    def _finalize_if_needed(self):
-        """如果已经到达或超过最大迭代次数，则执行收尾操作。"""
-        if self.current_iteration >= self.max_iterations:
-            self.loggers['main'].info("Max iterations reached, finalizing fuzzing process.")
+    def _finalize_if_needed(self, force_save: bool = False):
+        """如果已经到达或超过最大迭代次数，或强制保存，则执行收尾操作。"""
+        if force_save or self.current_iteration >= self.max_iterations:
+            self.loggers['main'].info("Finalizing fuzzing process.")
             self._log_final_stats()
             if self.save_results:
                 self._save_results()
